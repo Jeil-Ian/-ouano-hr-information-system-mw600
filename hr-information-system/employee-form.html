@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">Add employee · Personnel Register</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="brand">
+      <span class="mark">Personnel Register</span>
+      <span class="sub">Roster &amp; records</span>
+    </div>
+    <div class="tabs">
+      <a href="index.html">Overview</a>
+      <a href="employees.html" class="active">Employees</a>
+      <a href="departments.html">Departments</a>
+    </div>
+    <div class="sidebar-foot">Static build · local data only</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1 id="formHeading">Add employee</h1>
+        <p id="formSub">Enter their details to add them to the roster.</p>
+      </div>
+    </div>
+
+    <form class="form-card" id="employeeForm" novalidate>
+      <div class="field">
+        <label for="name">Full name</label>
+        <input type="text" id="name" required>
+        <div class="error-text" id="err-name"></div>
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" required>
+        <div class="error-text" id="err-email"></div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="department">Department</label>
+          <select id="department" required></select>
+          <div class="error-text" id="err-department"></div>
+        </div>
+        <div class="field">
+          <label for="position">Position</label>
+          <input type="text" id="position" required>
+          <div class="error-text" id="err-position"></div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status" required>
+            <option value="Active">Active</option>
+            <option value="On Leave">On Leave</option>
+            <option value="Terminated">Terminated</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dateHired">Date hired</label>
+          <input type="date" id="dateHired" required>
+          <div class="error-text" id="err-dateHired"></div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="submitBtn">Save employee</button>
+        <a href="employees.html" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="js/data.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const editId = params.get('id');
+  const isEdit = !!editId;
+
+  const deptSelect = document.getElementById('department');
+  getDepartments().forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    deptSelect.appendChild(opt);
+  });
+
+  if (isEdit) {
+    const emp = getEmployeeById(editId);
+    if (!emp) {
+      alert('That employee record no longer exists.');
+      location.href = 'employees.html';
+    } else {
+      document.getElementById('pageTitle').textContent = 'Edit employee · Personnel Register';
+      document.getElementById('formHeading').textContent = `Edit ${emp.name}`;
+      document.getElementById('formSub').textContent = 'Update their record below.';
+      document.getElementById('submitBtn').textContent = 'Save changes';
+      document.getElementById('name').value = emp.name;
+      document.getElementById('email').value = emp.email;
+      document.getElementById('department').value = emp.departmentId;
+      document.getElementById('position').value = emp.position;
+      document.getElementById('status').value = emp.status;
+      document.getElementById('dateHired').value = emp.dateHired;
+    }
+  }
+
+  document.getElementById('employeeForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const departmentId = document.getElementById('department').value;
+    const position = document.getElementById('position').value.trim();
+    const status = document.getElementById('status').value;
+    const dateHired = document.getElementById('dateHired').value;
+
+    ['name', 'email', 'department', 'position', 'dateHired'].forEach(id => {
+      document.getElementById('err-' + id).textContent = '';
+    });
+
+    let valid = true;
+    if (!name) { document.getElementById('err-name').textContent = 'Name is required.'; valid = false; }
+    if (!email || !email.includes('@')) { document.getElementById('err-email').textContent = 'Enter a valid email.'; valid = false; }
+    if (!departmentId) { document.getElementById('err-department').textContent = 'Choose a department.'; valid = false; }
+    if (!position) { document.getElementById('err-position').textContent = 'Position is required.'; valid = false; }
+    if (!dateHired) { document.getElementById('err-dateHired').textContent = 'Date hired is required.'; valid = false; }
+    if (!valid) return;
+
+    const record = {
+      id: isEdit ? editId : uid('e'),
+      name, email, departmentId, position, status, dateHired
+    };
+    upsertEmployee(record);
+    location.href = 'employees.html?saved=1';
+  });
+</script>
+</body>
+</html>

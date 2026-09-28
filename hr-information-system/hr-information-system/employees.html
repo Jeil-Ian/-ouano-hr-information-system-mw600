@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employees · Personnel Register</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="brand">
+      <span class="mark">Personnel Register</span>
+      <span class="sub">Roster &amp; records</span>
+    </div>
+    <div class="tabs">
+      <a href="index.html">Overview</a>
+      <a href="employees.html" class="active">Employees</a>
+      <a href="departments.html">Departments</a>
+    </div>
+    <div class="sidebar-foot">Static build · local data only</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Employees</h1>
+        <p>Every person on the roster. Search, filter, or open a record to edit it.</p>
+      </div>
+      <a href="employee-form.html" class="btn btn-primary">+ Add employee</a>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="searchInput" placeholder="Search by name or position…">
+      <select id="deptFilter"><option value="">All departments</option></select>
+      <select id="statusFilter">
+        <option value="">All statuses</option>
+        <option value="Active">Active</option>
+        <option value="On Leave">On Leave</option>
+        <option value="Terminated">Terminated</option>
+      </select>
+    </div>
+
+    <table class="ledger" id="table">
+      <thead>
+        <tr>
+          <th class="no">No.</th>
+          <th>Name</th>
+          <th>Department</th>
+          <th>Position</th>
+          <th>Hired</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <p>No employees match those filters.</p>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js"></script>
+<script>
+(async () => {
+  const departments = await getDepartments();
+  let allEmployees = await getEmployees();
+  const deptFilter = document.getElementById('deptFilter');
+  departments.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    deptFilter.appendChild(opt);
+  });
+
+  const searchInput = document.getElementById('searchInput');
+  const statusFilter = document.getElementById('statusFilter');
+  const tableBody = document.getElementById('tableBody');
+  const table = document.getElementById('table');
+  const emptyState = document.getElementById('emptyState');
+
+  function render() {
+    const q = searchInput.value.trim().toLowerCase();
+    const deptVal = deptFilter.value;
+    const statusVal = statusFilter.value;
+
+    let rows = allEmployees.filter(e => {
+      const matchesQ = !q || e.name.toLowerCase().includes(q) || e.position.toLowerCase().includes(q);
+      const matchesDept = !deptVal || e.departmentId === deptVal;
+      const matchesStatus = !statusVal || e.status === statusVal;
+      return matchesQ && matchesDept && matchesStatus;
+    });
+
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+
+    tableBody.innerHTML = '';
+    if (rows.length === 0) {
+      table.style.display = 'none';
+      emptyState.style.display = 'block';
+      return;
+    }
+    table.style.display = '';
+    emptyState.style.display = 'none';
+
+    rows.forEach((emp, i) => {
+      const dept = departments.find(d => d.id === emp.departmentId);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="no">${String(i + 1).padStart(2, '0')}</td>
+        <td>
+          <div class="name">${emp.name}</div>
+          <div class="email">${emp.email}</div>
+        </td>
+        <td>${dept ? dept.name : '—'}</td>
+        <td>${emp.position}</td>
+        <td>${formatDate(emp.dateHired)}</td>
+        <td><span class="stamp ${statusClass(emp.status)}">${emp.status}</span></td>
+        <td>
+          <div class="actions">
+            <a class="btn btn-ghost btn-small" href="employee-form.html?id=${emp.id}">Edit</a>
+            <button class="btn btn-danger btn-small" data-delete="${emp.id}">Delete</button>
+          </div>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  tableBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-delete]');
+    if (!btn) return;
+    const emp = allEmployees.find(x => x.id === btn.dataset.delete);
+    if (confirm(`Remove ${emp.name} from the roster? This can't be undone.`)) {
+      try { await deleteEmployee(emp.id); } catch (err) { return showToast(err.message); }
+      allEmployees = allEmployees.filter(x => x.id !== emp.id);
+      showToast(`${emp.name} removed.`);
+      render();
+    }
+  });
+
+  searchInput.addEventListener('input', render);
+  deptFilter.addEventListener('change', render);
+  statusFilter.addEventListener('change', render);
+
+  render();
+
+  // Show a toast if we just returned from a save
+  const params = new URLSearchParams(location.search);
+  if (params.get('saved') === '1') {
+    showToast('Record saved.');
+  }
+})();
+</script>
+</body>
+</html>

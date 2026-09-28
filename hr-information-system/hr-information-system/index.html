@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overview · Personnel Register</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="brand">
+      <span class="mark">Personnel Register</span>
+      <span class="sub">Roster &amp; records</span>
+    </div>
+    <div class="tabs">
+      <a href="index.html" class="active">Overview</a>
+      <a href="employees.html">Employees</a>
+      <a href="departments.html">Departments</a>
+    </div>
+    <div class="sidebar-foot">Static build · local data only</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Overview</h1>
+        <p>A running count of who's on the books, where they sit, and what needs a look.</p>
+      </div>
+      <a href="employee-form.html" class="btn btn-primary">+ Add employee</a>
+    </div>
+
+    <div class="stat-hero">
+      <span class="big" id="totalCount">0</span>
+      <span class="big-label">employees on record</span>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="num" id="deptCount">0</div>
+        <div class="label">Departments</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="leaveCount">0</div>
+        <div class="label">Currently on leave</div>
+      </div>
+      <div class="stat-card">
+        <div class="num" id="recentCount">0</div>
+        <div class="label">Hired in the last 90 days</div>
+      </div>
+    </div>
+
+    <div class="section-label">
+      <span>Most recently added</span>
+      <a href="employees.html" class="btn btn-ghost btn-small">View full roster</a>
+    </div>
+
+    <table class="ledger" id="recentTable">
+      <thead>
+        <tr>
+          <th class="no">No.</th>
+          <th>Name</th>
+          <th>Department</th>
+          <th>Position</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="recentBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <p>No employees on record yet.</p>
+      <a href="employee-form.html" class="btn btn-primary">Add the first employee</a>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js"></script>
+<script>
+(async () => {
+  const employees = await getEmployees();
+  const departments = await getDepartments();
+  const deptMap = Object.fromEntries(departments.map(d => [d.id, d]));
+
+  document.getElementById('totalCount').textContent = employees.length;
+  document.getElementById('deptCount').textContent = departments.length;
+  document.getElementById('leaveCount').textContent = employees.filter(e => e.status === 'On Leave').length;
+
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  document.getElementById('recentCount').textContent = employees.filter(e => new Date(e.dateHired) >= ninetyDaysAgo).length;
+
+  const recent = [...employees]
+    .sort((a, b) => new Date(b.dateHired) - new Date(a.dateHired))
+    .slice(0, 5);
+
+  const body = document.getElementById('recentBody');
+  if (recent.length === 0) {
+    document.getElementById('recentTable').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+  } else {
+    recent.forEach((emp, i) => {
+      const dept = deptMap[emp.departmentId];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="no">${String(i + 1).padStart(2, '0')}</td>
+        <td class="name">${emp.name}</td>
+        <td>${dept ? dept.name : '—'}</td>
+        <td>${emp.position}</td>
+        <td><span class="stamp ${statusClass(emp.status)}">${emp.status}</span></td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+})();
+</script>
+</body>
+</html>

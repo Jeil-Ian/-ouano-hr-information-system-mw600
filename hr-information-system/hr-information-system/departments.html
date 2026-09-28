@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Departments · Personnel Register</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="brand">
+      <span class="mark">Personnel Register</span>
+      <span class="sub">Roster &amp; records</span>
+    </div>
+    <div class="tabs">
+      <a href="index.html">Overview</a>
+      <a href="employees.html">Employees</a>
+      <a href="departments.html" class="active">Departments</a>
+    </div>
+    <div class="sidebar-foot">Static build · local data only</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Departments</h1>
+        <p>The units employees are grouped under. Deleting one leaves its employees unassigned.</p>
+      </div>
+      <button class="btn btn-primary" id="addBtn">+ Add department</button>
+    </div>
+
+    <div class="dept-list" id="deptList"></div>
+
+    <form class="form-card" id="deptForm" style="display:none;">
+      <h2 id="formHeading" style="margin-bottom:20px; font-size:20px;">Add department</h2>
+      <div class="field">
+        <label for="deptName">Name</label>
+        <input type="text" id="deptName" required>
+        <div class="error-text" id="err-deptName"></div>
+      </div>
+      <div class="field">
+        <label for="deptHead">Department head</label>
+        <input type="text" id="deptHead" required>
+        <div class="error-text" id="err-deptHead"></div>
+      </div>
+      <div class="field">
+        <label for="deptDesc">Description</label>
+        <input type="text" id="deptDesc" placeholder="What this department is responsible for">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="deptSubmitBtn">Save department</button>
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js"></script>
+<script>
+(async () => {
+  const deptList = document.getElementById('deptList');
+  const deptForm = document.getElementById('deptForm');
+  const addBtn = document.getElementById('addBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const formHeading = document.getElementById('formHeading');
+  const deptSubmitBtn = document.getElementById('deptSubmitBtn');
+
+  let editingId = null;
+  let cachedDepts = [];
+
+  async function render() {
+    const departments = await getDepartments();
+    const employees = await getEmployees();
+    cachedDepts = departments;
+    deptList.innerHTML = '';
+    departments.forEach(d => {
+      const row = document.createElement('div');
+      row.className = 'dept-row';
+      row.innerHTML = `
+        <div class="name">${d.name}</div>
+        <div class="head">Head: ${d.head}<br><span style="color:var(--muted)">${employees.filter(e => e.departmentId === d.id).length} employee(s)</span></div>
+        <div class="desc">${d.description || ''}</div>
+        <div class="actions">
+          <button class="btn btn-ghost btn-small" data-edit="${d.id}">Edit</button>
+          <button class="btn btn-danger btn-small" data-delete="${d.id}">Delete</button>
+        </div>
+      `;
+      deptList.appendChild(row);
+    });
+  }
+
+  function openForm(dept) {
+    deptForm.style.display = 'block';
+    if (dept) {
+      editingId = dept.id;
+      formHeading.textContent = `Edit ${dept.name}`;
+      deptSubmitBtn.textContent = 'Save changes';
+      document.getElementById('deptName').value = dept.name;
+      document.getElementById('deptHead').value = dept.head;
+      document.getElementById('deptDesc').value = dept.description || '';
+    } else {
+      editingId = null;
+      formHeading.textContent = 'Add department';
+      deptSubmitBtn.textContent = 'Save department';
+      deptForm.reset();
+    }
+    deptForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function closeForm() {
+    deptForm.style.display = 'none';
+    deptForm.reset();
+    editingId = null;
+  }
+
+  addBtn.addEventListener('click', () => openForm(null));
+  cancelBtn.addEventListener('click', closeForm);
+
+  deptList.addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('[data-edit]');
+    const delBtn = e.target.closest('[data-delete]');
+    if (editBtn) {
+      openForm(cachedDepts.find(d => d.id === editBtn.dataset.edit));
+    }
+    if (delBtn) {
+      const dept = cachedDepts.find(d => d.id === delBtn.dataset.delete);
+      const count = (await getEmployees()).filter(x => x.departmentId === dept.id).length;
+      const warning = count > 0
+        ? `${dept.name} has ${count} employee(s) assigned. Delete it anyway?`
+        : `Delete ${dept.name}?`;
+      if (confirm(warning)) {
+        await deleteDepartment(dept.id);
+        showToast(`${dept.name} deleted.`);
+        render();
+      }
+    }
+  });
+
+  deptForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('deptName').value.trim();
+    const head = document.getElementById('deptHead').value.trim();
+    const description = document.getElementById('deptDesc').value.trim();
+
+    document.getElementById('err-deptName').textContent = '';
+    document.getElementById('err-deptHead').textContent = '';
+
+    let valid = true;
+    if (!name) { document.getElementById('err-deptName').textContent = 'Name is required.'; valid = false; }
+    if (!head) { document.getElementById('err-deptHead').textContent = 'Department head is required.'; valid = false; }
+    if (!valid) return;
+
+    await upsertDepartment({
+      id: editingId || uid('d'),
+      name, head, description
+    });
+    showToast(editingId ? 'Department updated.' : 'Department added.');
+    closeForm();
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
